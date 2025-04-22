@@ -7,7 +7,8 @@
     float: right;
     font-size: extra large;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
-    text-decoration-color: rgb(0, 0, 66)
+    text-decoration-color: rgb(0, 0, 66);
+    padding: 1rem;
 }
 .nav-menu {
     list-style: none;
@@ -16,6 +17,7 @@
     display: flex;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     gap: 1rem; /* spacing between items */
+    justify-content: center;
 }
 .nav-menu li a {
     text-decoration: none;
