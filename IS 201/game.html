@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Monster Maze v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Press Start 2P', cursive; /* Apply arcade font */
+            background-color: #1a1a1a; /* Dark background */
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column; /* Stack elements vertically */
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        canvas {
+            background-color: #000; /* Black background for the maze */
+            display: block; /* Remove extra space below canvas */
+            border: 5px solid #4a4a4a; /* Grey border */
+            border-radius: 8px; /* Rounded corners for canvas */
+            box-shadow: 0 0 15px rgba(0, 150, 255, 0.5); /* Blue glow */
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem; /* Space between elements */
+            padding: 1rem;
+        }
+        .controls button, .difficulty button {
+            font-family: 'Press Start 2P', cursive; /* Ensure buttons use the font */
+            background-color: #007bff; /* Blue buttons */
+            color: white;
+            border: 2px solid #0056b3;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        .controls button:hover, .difficulty button:hover {
+            background-color: #0056b3;
+        }
+        .controls button:active, .difficulty button:active {
+            transform: scale(0.95);
+        }
+        .difficulty button.selected {
+             background-color: #ffc107; /* Yellow for selected */
+             color: #000;
+             border-color: #e0a800;
+        }
+        .info {
+            font-size: 1.2rem; /* Larger score text */
+            margin-bottom: 1rem;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+         .message {
+            font-size: 1.5rem;
+            color: #ffc107; /* Yellow for messages */
+            min-height: 2rem; /* Reserve space for messages */
+            text-align: center;
+         }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-3xl mb-4 text-blue-400">Cookie Monster Maze</h1>
+
+        <div class="info w-full flex justify-between px-4">
+            <span>Score: <span id="score">0</span></span>
+            <span>Level: <span id="level-display">Easy</span></span>
+        </div>
+
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <div id="message" class="message mt-4">Select difficulty and press Start!</div>
+
+        <div class="difficulty space-x-2 my-4">
+            <button id="easyBtn" onclick="setDifficulty('easy')" class="selected">Easy</button>
+            <button id="mediumBtn" onclick="setDifficulty('medium')">Medium</button>
+            <button id="hardBtn" onclick="setDifficulty('hard')">Hard</button>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" onclick="startGame()">Start Game</button>
+        </div>
+
+         <p class="mt-4 text-xs text-gray-400">Use Arrow Keys to move Cookie Monster!</p>
+         <p class="mt-2 text-xs text-red-400">(Hard Mode: Avoid Oscar!)</p>
+    </div>
+
+    <script>
+        // --- Game Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const messageElement = document.getElementById('message');
+        const levelDisplayElement = document.getElementById('level-display');
+        const easyBtn = document.getElementById('easyBtn');
+        const mediumBtn = document.getElementById('mediumBtn');
+        const hardBtn = document.getElementById('hardBtn');
+        const startBtn = document.getElementById('startBtn');
+
+        const TILE_SIZE = 20; // Size of each grid cell
+        const ROWS = canvas.height / TILE_SIZE;
+        const COLS = canvas.width / TILE_SIZE;
+
+        // Simpler Maze Representation (0: Wall, 1: Path, 2: Cookie)
+        let maze = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+            [0, 2, 0, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 0, 2, 0, 0, 2, 0],
+            [0, 2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 2, 0],
+            [0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0],
+            [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+            [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0],
+            [0, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 0], // Start position area (1)
+            [0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0],
+            [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+            [0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0],
+            [0, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 0],
+            [0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0],
+            [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+            [0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+            [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+
+        // Game State
+        let score = 0;
+        let cookieMonster = { x: 9, y: 8, dx: 0, dy: 0, desiredDx: 0, desiredDy: 0 }; // Start position
+        let trashcans = []; // { x, y, spawnTime, oscarTime }
+        let oscar = { x: 1, y: 1, dx: 0, dy: 0, isActive: false, speed: 8 }; // Oscar object for hard mode, speed (higher is slower)
+        let totalCookies = 0;
+        let cookiesEaten = 0;
+        let gameRunning = false;
+        let currentDifficulty = 'easy';
+        let difficultySettings = {
+            easy:   { spawnRate: 5000, maxCans: 3, cookiePenalty: 0.1, oscarActive: false }, // ms between spawns, max cans, less cookies
+            medium: { spawnRate: 3500, maxCans: 5, cookiePenalty: 0.3, oscarActive: false },
+            hard:   { spawnRate: 2500, maxCans: 4, cookiePenalty: 0.5, oscarActive: true } // Oscar is active! Fewer trashcans needed as Oscar is main threat
+        };
+        let trashcanSpawnTimer = null;
+        let animationFrameId = null;
+        let gameTick = 0; // Counter for timing actions
+
+        // --- Drawing Functions ---
+
+        function drawMaze() {
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const tile = maze[row][col];
+                    if (tile === 0) { // Wall
+                        ctx.fillStyle = '#1E90FF'; // Dodger blue walls
+                        ctx.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        // Add a slight inner shadow effect for walls
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                        ctx.fillRect(col * TILE_SIZE + 2, row * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                    } else if (tile === 1 || tile === 2) { // Path or Path with Cookie
+                        ctx.fillStyle = '#000'; // Black path
+                        ctx.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        if (tile === 2) { // Cookie
+                            drawCookie(col, row);
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawCookie(col, row) {
+            ctx.fillStyle = '#D2691E'; // Brown color for cookies (chocolate chip)
+            ctx.beginPath();
+            ctx.arc(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Add 'chips'
+            ctx.fillStyle = '#8B4513'; // Darker brown
+            ctx.fillRect(col * TILE_SIZE + TILE_SIZE * 0.4, row * TILE_SIZE + TILE_SIZE * 0.3, 2, 2);
+            ctx.fillRect(col * TILE_SIZE + TILE_SIZE * 0.6, row * TILE_SIZE + TILE_SIZE * 0.6, 2, 2);
+             ctx.fillRect(col * TILE_SIZE + TILE_SIZE * 0.3, row * TILE_SIZE + TILE_SIZE * 0.5, 2, 2);
+        }
+
+        function drawCookieMonster() {
+            const cmX = cookieMonster.x * TILE_SIZE + TILE_SIZE / 2;
+            const cmY = cookieMonster.y * TILE_SIZE + TILE_SIZE / 2;
+            const radius = TILE_SIZE / 2 - 2;
+
+            // Body
+            ctx.fillStyle = '#1E90FF'; // Cookie Monster blue
+            ctx.beginPath();
+            ctx.arc(cmX, cmY, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+             // Eyes
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(cmX - radius * 0.3, cmY - radius * 0.3, radius * 0.3, 0, Math.PI * 2); // Left eye
+            ctx.arc(cmX + radius * 0.3, cmY - radius * 0.3, radius * 0.3, 0, Math.PI * 2); // Right eye
+            ctx.fill();
+
+            // Pupils (looking in direction of movement)
+            ctx.fillStyle = 'black';
+            let pupilOffsetX = 0;
+            let pupilOffsetY = -radius * 0.1; // Default looking slightly up/forward
+             if (cookieMonster.dx > 0) pupilOffsetX = radius * 0.1;
+             if (cookieMonster.dx < 0) pupilOffsetX = -radius * 0.1;
+             if (cookieMonster.dy > 0) pupilOffsetY = radius * 0.1;
+             if (cookieMonster.dy < 0) pupilOffsetY = -radius * 0.15; // Look more up when moving up
+
+            ctx.beginPath();
+            ctx.arc(cmX - radius * 0.3 + pupilOffsetX, cmY - radius * 0.3 + pupilOffsetY, radius * 0.15, 0, Math.PI * 2); // Left pupil
+            ctx.arc(cmX + radius * 0.3 + pupilOffsetX, cmY - radius * 0.3 + pupilOffsetY, radius * 0.15, 0, Math.PI * 2); // Right pupil
+            ctx.fill();
+        }
+
+        function drawTrashcans() {
+            const now = Date.now();
+            trashcans.forEach(can => {
+                const canX = can.x * TILE_SIZE;
+                const canY = can.y * TILE_SIZE;
+
+                if (can.oscarTime && now < can.oscarTime + 500) { // Show Oscar popping out
+                     ctx.fillStyle = '#28a745'; // Green for Oscar
+                     ctx.fillRect(canX + 1, canY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                     // Simple angry eyes
+                     ctx.fillStyle = 'white';
+                     ctx.fillRect(canX + TILE_SIZE * 0.2, canY + TILE_SIZE * 0.3, TILE_SIZE * 0.2, TILE_SIZE * 0.2); // Left Eye
+                     ctx.fillRect(canX + TILE_SIZE * 0.6, canY + TILE_SIZE * 0.3, TILE_SIZE * 0.2, TILE_SIZE * 0.2); // Right Eye
+                     ctx.fillStyle = 'black'; // Pupils
+                     ctx.fillRect(canX + TILE_SIZE * 0.25, canY + TILE_SIZE * 0.35, TILE_SIZE * 0.1, TILE_SIZE * 0.1);
+                     ctx.fillRect(canX + TILE_SIZE * 0.65, canY + TILE_SIZE * 0.35, TILE_SIZE * 0.1, TILE_SIZE * 0.1);
+                      // Angry brow
+                     ctx.fillRect(canX + TILE_SIZE * 0.2, canY + TILE_SIZE * 0.2, TILE_SIZE * 0.6, TILE_SIZE * 0.05);
+
+                } else if (!can.oscarTime) { // Draw normal trashcan
+                    ctx.fillStyle = '#6c757d'; // Grey for trashcan body
+                    ctx.fillRect(canX + 2, canY + TILE_SIZE * 0.2, TILE_SIZE - 4, TILE_SIZE * 0.8 - 2); // Main body
+                     // Lid
+                    ctx.fillStyle = '#495057'; // Darker grey lid
+                    ctx.fillRect(canX + 1, canY + 1, TILE_SIZE - 2, TILE_SIZE * 0.2); // Lid
+                    // Handle
+                     ctx.fillStyle = '#343a40';
+                     ctx.fillRect(canX + TILE_SIZE * 0.4, canY, TILE_SIZE * 0.2, TILE_SIZE * 0.1);
+                }
+                 // Can might disappear after Oscar pops, handled in update logic
+            });
+        }
+
+        function drawOscar() {
+            if (!oscar.isActive) return;
+
+            const oscarX = oscar.x * TILE_SIZE + TILE_SIZE / 2;
+            const oscarY = oscar.y * TILE_SIZE + TILE_SIZE / 2;
+            const radius = TILE_SIZE / 2 - 3; // Slightly smaller than CM
+
+            // Body
+            ctx.fillStyle = '#28a745'; // Oscar Green
+            ctx.beginPath();
+            ctx.arc(oscarX, oscarY, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Single Brow
+            ctx.fillStyle = '#A0522D'; // Brownish brow
+            ctx.fillRect(oscarX - radius * 0.6, oscarY - radius * 0.5, radius * 1.2, radius * 0.3);
+
+            // Eyes (under brow)
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(oscarX - radius * 0.3, oscarY - radius * 0.1, radius * 0.3, 0, Math.PI * 2); // Left eye
+            ctx.arc(oscarX + radius * 0.3, oscarY - radius * 0.1, radius * 0.3, 0, Math.PI * 2); // Right eye
+            ctx.fill();
+
+            // Pupils (looking towards Cookie Monster)
+            ctx.fillStyle = 'black';
+            let targetX = cookieMonster.x * TILE_SIZE + TILE_SIZE / 2;
+            let targetY = cookieMonster.y * TILE_SIZE + TILE_SIZE / 2;
+            let angle = Math.atan2(targetY - oscarY, targetX - oscarX);
+            let pupilOffsetX = Math.cos(angle) * radius * 0.1;
+            let pupilOffsetY = Math.sin(angle) * radius * 0.1;
+
+            ctx.beginPath();
+            ctx.arc(oscarX - radius * 0.3 + pupilOffsetX, oscarY - radius * 0.1 + pupilOffsetY, radius * 0.15, 0, Math.PI * 2); // Left pupil
+            ctx.arc(oscarX + radius * 0.3 + pupilOffsetX, oscarY - radius * 0.1 + pupilOffsetY, radius * 0.15, 0, Math.PI * 2); // Right pupil
+            ctx.fill();
+        }
+
+
+        // --- Game Logic ---
+
+        function updateScore(change) {
+            score += change;
+            scoreElement.textContent = score;
+        }
+
+        function moveCookieMonster() {
+             if (!gameRunning) return; // Don't move if game isn't running
+            // Try moving in the desired direction first
+            let nextX = cookieMonster.x + cookieMonster.desiredDx;
+            let nextY = cookieMonster.y + cookieMonster.desiredDy;
+
+            // Check bounds and wall collision for desired direction
+            if (isValidMove(nextX, nextY)) {
+                cookieMonster.dx = cookieMonster.desiredDx;
+                cookieMonster.dy = cookieMonster.desiredDy;
+            } else {
+                 // If desired direction is blocked, try continuing in the current direction
+                 nextX = cookieMonster.x + cookieMonster.dx;
+                 nextY = cookieMonster.y + cookieMonster.dy;
+                 // Check bounds and wall collision for current direction
+                 if (!isValidMove(nextX, nextY)) {
+                     // Stop if current direction is also blocked
+                     cookieMonster.dx = 0;
+                     cookieMonster.dy = 0;
+                     return; // Don't move
+                 }
+            }
+
+             // Update position based on valid direction (if any movement occurred)
+             if (cookieMonster.dx !== 0 || cookieMonster.dy !== 0) {
+                 cookieMonster.x += cookieMonster.dx;
+                 cookieMonster.y += cookieMonster.dy;
+             } else {
+                 return; // No movement, skip collision checks
+             }
+
+
+            // Check for cookie collision
+            if (maze[cookieMonster.y][cookieMonster.x] === 2) {
+                maze[cookieMonster.y][cookieMonster.x] = 1; // Eat cookie (change tile to path)
+                updateScore(10);
+                cookiesEaten++;
+                // Check for win condition
+                if (cookiesEaten >= totalCookies) {
+                    endGame("OM NOM NOM! You ate all the cookies!");
+                }
+            }
+
+            // Check for trashcan collision (only if Oscar isn't active chasing)
+             if (!oscar.isActive) {
+                const hitCanIndex = trashcans.findIndex(can => !can.oscarTime && can.x === cookieMonster.x && can.y === cookieMonster.y);
+                if (hitCanIndex > -1) {
+                    updateScore(-5);
+                    const canToRemove = trashcans[hitCanIndex]; // Store reference before modifying time
+                    canToRemove.oscarTime = Date.now(); // Mark the can as hit to show Oscar
+                    messageElement.textContent = "SCRAM! -5 Points!";
+                    // Remove the can after a short delay
+                    setTimeout(() => {
+                         // Find the index again in case array changed
+                         const currentCanIndex = trashcans.findIndex(c => c.x === canToRemove.x && c.y === canToRemove.y && c.spawnTime === canToRemove.spawnTime);
+                         if (currentCanIndex > -1) {
+                            trashcans.splice(currentCanIndex, 1);
+                         }
+                         if (gameRunning) messageElement.textContent = ""; // Clear message if game still running
+                    }, 500); // Oscar visible for 0.5 seconds
+                }
+             }
+
+             // Check for Oscar collision (Hard mode) - Moved check to after Oscar moves
+        }
+
+        function moveOscar() {
+            if (!oscar.isActive || !gameRunning) return;
+
+            // Basic chase logic: move towards Cookie Monster's current grid position
+            let targetX = cookieMonster.x;
+            let targetY = cookieMonster.y;
+            let currentX = oscar.x;
+            let currentY = oscar.y;
+
+            let bestDx = 0;
+            let bestDy = 0;
+
+            // Determine primary direction towards target
+            let dx = Math.sign(targetX - currentX);
+            let dy = Math.sign(targetY - currentY);
+
+            // Prioritize direction with greater distance, try that first
+            if (Math.abs(targetX - currentX) >= Math.abs(targetY - currentY)) {
+                // Try horizontal first
+                if (dx !== 0 && isValidMove(currentX + dx, currentY)) {
+                    bestDx = dx;
+                    bestDy = 0;
+                } else if (dy !== 0 && isValidMove(currentX, currentY + dy)) { // Try vertical if horizontal blocked
+                    bestDx = 0;
+                    bestDy = dy;
+                } else if (isValidMove(currentX, currentY - dy) && dy !== 0) { // Try other vertical
+                     bestDx = 0;
+                     bestDy = -dy;
+                } else if (isValidMove(currentX - dx, currentY) && dx !== 0) { // Try other horizontal
+                     bestDx = -dx;
+                     bestDy = 0;
+                }
+            } else {
+                // Try vertical first
+                if (dy !== 0 && isValidMove(currentX, currentY + dy)) {
+                    bestDx = 0;
+                    bestDy = dy;
+                } else if (dx !== 0 && isValidMove(currentX + dx, currentY)) { // Try horizontal if vertical blocked
+                    bestDx = dx;
+                    bestDy = 0;
+                } else if (isValidMove(currentX - dx, currentY) && dx !== 0) { // Try other horizontal
+                     bestDx = -dx;
+                     bestDy = 0;
+                } else if (isValidMove(currentX, currentY - dy) && dy !== 0) { // Try other vertical
+                     bestDx = 0;
+                     bestDy = -dy;
+                 }
+            }
+
+             // If still no valid move, check adjacent tiles randomly
+             if (bestDx === 0 && bestDy === 0) {
+                 const possibleMoves = [ {dx: 1, dy: 0}, {dx: -1, dy: 0}, {dx: 0, dy: 1}, {dx: 0, dy: -1} ];
+                 const validMoves = possibleMoves.filter(move => isValidMove(currentX + move.dx, currentY + move.dy));
+                 if (validMoves.length > 0) {
+                     const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                     bestDx = randomMove.dx;
+                     bestDy = randomMove.dy;
+                 }
+             }
+
+
+            // Update Oscar's position
+            oscar.x += bestDx;
+            oscar.y += bestDy;
+
+             // Check for collision with Cookie Monster immediately after moving
+             if (oscar.x === cookieMonster.x && oscar.y === cookieMonster.y) {
+                 endGame("Caught by Oscar! SCRAM!");
+             }
+        }
+
+        function isValidMove(x, y) {
+            // Check bounds and if it's not a wall (tile value 0)
+            return x >= 0 && x < COLS && y >= 0 && y < ROWS && maze[y][x] !== 0;
+        }
+
+
+        function spawnTrashcan() {
+            // Don't spawn trashcans in hard mode (Oscar is the main threat)
+            if (!gameRunning || currentDifficulty === 'hard' || trashcans.filter(can => !can.oscarTime).length >= difficultySettings[currentDifficulty].maxCans) {
+                return;
+            }
+
+            let spawned = false;
+            let attempts = 0;
+            while (!spawned && attempts < 50) { // Limit attempts
+                const randRow = Math.floor(Math.random() * ROWS);
+                const randCol = Math.floor(Math.random() * COLS);
+
+                // Check if the spot is a valid path, not Cookie Monster's/Oscar's spot, and not already a trashcan
+                if (maze[randRow][randCol] !== 0 &&
+                    !(randRow === cookieMonster.y && randCol === cookieMonster.x) &&
+                    !(oscar.isActive && randRow === oscar.y && randCol === oscar.x) && // Avoid Oscar too
+                    !trashcans.some(can => can.x === randCol && can.y === randRow))
+                {
+                    trashcans.push({ x: randCol, y: randRow, spawnTime: Date.now(), oscarTime: null });
+                    spawned = true;
+                }
+                attempts++;
+            }
+        }
+
+        function handleInput(event) {
+            if (!gameRunning) return;
+
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'w':
+                    cookieMonster.desiredDx = 0;
+                    cookieMonster.desiredDy = -1;
+                    break;
+                case 'ArrowDown':
+                case 's':
+                    cookieMonster.desiredDx = 0;
+                    cookieMonster.desiredDy = 1;
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                    cookieMonster.desiredDx = -1;
+                    cookieMonster.desiredDy = 0;
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                    cookieMonster.desiredDx = 1;
+                    cookieMonster.desiredDy = 0;
+                    break;
+            }
+             event.preventDefault(); // Prevent arrow keys from scrolling page
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            gameTick++;
+
+            // --- Update Game State ---
+            // Move Cookie Monster (controlled speed)
+             if (gameTick % 6 === 0) { // Adjust divisor for CM speed (smaller = faster)
+                 moveCookieMonster();
+                 // Collision check with Oscar might happen here if CM moves onto Oscar
+                 if (oscar.isActive && oscar.x === cookieMonster.x && oscar.y === cookieMonster.y) {
+                    endGame("Caught by Oscar! SCRAM!");
+                    return; // End loop immediately
+                 }
+             }
+
+
+             // Move Oscar (Hard mode, controlled speed)
+             if (oscar.isActive && gameTick % oscar.speed === 0) { // Adjust oscar.speed for difficulty
+                 moveOscar();
+                  // Collision check happens inside moveOscar after he moves
+             }
+
+            // --- Drawing ---
+             if (!gameRunning) return; // Check again in case game ended during updates
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw elements
+            drawMaze();
+            drawTrashcans(); // Draw trashcans (relevant in Easy/Medium)
+            if (oscar.isActive) { // Draw Oscar only if active
+                drawOscar();
+            }
+            drawCookieMonster(); // Draw CM last so he's on top (except maybe Oscar)
+
+
+            // Request next frame
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function setDifficulty(difficulty) {
+            if (gameRunning) return; // Don't change difficulty mid-game
+
+            currentDifficulty = difficulty;
+            levelDisplayElement.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+            oscar.speed = (difficulty === 'hard') ? 7 : 10; // Oscar is faster on hard (lower number = faster update)
+
+            // Update button styles
+            [easyBtn, mediumBtn, hardBtn].forEach(btn => btn.classList.remove('selected'));
+            if (difficulty === 'easy') easyBtn.classList.add('selected');
+            if (difficulty === 'medium') mediumBtn.classList.add('selected');
+            if (difficulty === 'hard') hardBtn.classList.add('selected');
+
+            console.log("Difficulty set to:", currentDifficulty);
+        }
+
+         function resetMazeAndCookies() {
+             // Reset maze to the base layout, ensuring paths are '1' initially
+              maze = [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0],
+                [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0],
+                [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], // Start position area (1)
+                [0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                [0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0],
+                [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            ];
+
+
+             totalCookies = 0;
+             cookiesEaten = 0; // Reset eaten count here
+             const cookieRemovalChance = difficultySettings[currentDifficulty].cookiePenalty;
+
+             for (let r = 0; r < ROWS; r++) {
+                 for (let c = 0; c < COLS; c++) {
+                     // Check original maze design for potential path spots (value 1)
+                     if (maze[r][c] === 1) {
+                          // Check if it's the starting area - no cookies there
+                          const isStartArea = (r === 8 && (c >= 9 && c <= 10));
+                          if (!isStartArea && Math.random() > cookieRemovalChance) { // Apply difficulty penalty
+                               maze[r][c] = 2; // Place cookie
+                               totalCookies++;
+                          } else {
+                               maze[r][c] = 1; // Ensure it's a path if no cookie
+                          }
+                     }
+                 }
+             }
+              // Ensure starting position is clear path
+             maze[8][9] = 1;
+             maze[8][10] = 1;
+             // Ensure Oscar's potential start is clear path
+             maze[1][1] = 1;
+             console.log("Total cookies for level:", totalCookies);
+         }
+
+
+        function startGame() {
+            console.log("Starting game with difficulty:", currentDifficulty);
+            if (gameRunning) {
+                endGame("Game Restarted."); // Stop previous game if running
+            }
+
+            // Reset game state
+            score = 0;
+            // cookiesEaten = 0; // Moved reset to resetMazeAndCookies
+            gameTick = 0;
+            trashcans = [];
+            cookieMonster = { x: 9, y: 8, dx: 0, dy: 0, desiredDx: 0, desiredDy: 0 }; // Reset position/movement
+            oscar = { x: 1, y: 1, dx: 0, dy: 0, isActive: false, speed: difficultySettings[currentDifficulty].speed || 7 }; // Reset Oscar
+
+            resetMazeAndCookies(); // Reset maze and place cookies based on difficulty
+
+            updateScore(0); // Update display
+            messageElement.textContent = "";
+            startBtn.textContent = "Restart Game";
+            startBtn.disabled = true; // Disable start button briefly to prevent spamming
+            setTimeout(() => { startBtn.disabled = false; }, 500); // Re-enable after delay
+
+            gameRunning = true;
+
+            // Activate Oscar in Hard mode after a delay
+            if (difficultySettings[currentDifficulty].oscarActive) {
+                setTimeout(() => {
+                    if (gameRunning && currentDifficulty === 'hard') { // Check if game still running and mode is hard
+                         oscar.isActive = true;
+                         oscar.x = 1; // Set start position
+                         oscar.y = 1;
+                         console.log("Oscar activated!");
+                         messageElement.textContent = "Oscar is coming!";
+                         setTimeout(() => { if(gameRunning) messageElement.textContent = "";}, 2000); // Clear message
+                    }
+                }, 3000); // 3 second delay before Oscar appears
+            }
+
+
+            // Clear any existing spawn timer
+            if (trashcanSpawnTimer) clearInterval(trashcanSpawnTimer);
+            // Start trashcan spawning (only if Oscar is not active)
+            if (!difficultySettings[currentDifficulty].oscarActive) {
+                 trashcanSpawnTimer = setInterval(spawnTrashcan, difficultySettings[currentDifficulty].spawnRate);
+            }
+
+             // Cancel previous animation frame if any
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            // Start the game loop
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function endGame(msg) {
+            gameRunning = false;
+            messageElement.textContent = msg + " Final Score: " + score;
+            startBtn.textContent = "Start Game";
+            startBtn.disabled = false; // Ensure start button is enabled
+            if (trashcanSpawnTimer) clearInterval(trashcanSpawnTimer);
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = null; // Clear the ID
+            trashcanSpawnTimer = null;
+            oscar.isActive = false; // Deactivate Oscar
+            cookieMonster.dx = 0; // Stop movement
+            cookieMonster.dy = 0;
+            cookieMonster.desiredDx = 0;
+            cookieMonster.desiredDy = 0;
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', handleInput);
+
+        // --- Initial Draw ---
+        // Draw the initial state before starting
+        setDifficulty('easy'); // Default to easy
+        resetMazeAndCookies(); // Place initial cookies based on default difficulty
+        drawMaze();
+        drawCookieMonster();
+
+    </script>
+</body>
+</html>
+```
+
+You can use the "Start Game" button and the difficulty selectors as before. Enjoy playi
