@@ -1,0 +1,20 @@
+body{
+    margin: 12px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    background-color: rgb(255, 255, 255);
+    font-size: larger !important;
+}
+h6{
+    font-size: medium;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    text-decoration-color: grey;
+}
+h3{
+    font-size: medium;
+}
+h4:hover{
+    background-color: rgba(224, 251, 242, 0.573);
+}
+
+
+
