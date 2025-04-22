@@ -13,13 +13,17 @@
             font-family: 'Press Start 2P', cursive; /* Apply arcade font */
             background-color: #1a1a1a; /* Dark background */
             color: #fff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            display: flex; /* Keep flex if you want centering */
+            justify-content: center; /* Centers the flex container horizontally */
+            align-items: center; /* Centers the flex container vertically IF height allows*/
+            min-height: 100vh; /* Ensure body takes at least full viewport height */
             flex-direction: column; /* Stack elements vertically */
-            overflow: auto; /* Prevent scrollbars */
+            /* overflow: hidden; */ /* REMOVE or CHANGE this line */
+            overflow-y: auto; /* ALLOW vertical scrolling IF needed */
+            padding-top: 20px; /* Optional: Add some space at the top */
+            padding-bottom: 20px; /* Optional: Add some space at the bottom */
         }
+
         canvas {
             background-color: #000; /* Black background for the maze */
             display: block; /* Remove extra space below canvas */
@@ -31,8 +35,10 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1rem; /* Space between elements */
+            gap: 1rem;
             padding: 1rem;
+            margin: 0 auto; /* Center the container itself on the page */
+            max-width: 600px; /* Optional: Limit container width */
         }
         .controls button, .difficulty button {
             font-family: 'Press Start 2P', cursive; /* Ensure buttons use the font */
